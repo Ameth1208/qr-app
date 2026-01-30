@@ -42,24 +42,36 @@ export async function POST(req: NextRequest) {
     let finalQrData = rawData;
 
     if (mode === "dynamic") {
+      console.log("Starting dynamic URL creation for:", rawData);
       // Basic URL validation only for dynamic mode since it needs a redirect
       try {
         new URL(rawData);
         const shortUrl = await createShortUrl(rawData);
+        console.log("Firebase short URL created:", shortUrl.shortId);
+
         const baseUrl =
-          process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+          process.env.NEXT_PUBLIC_BASE_URL ||
+          (typeof window !== "undefined"
+            ? window.location.origin
+            : "https://qrz.vercel.app");
+
         finalQrData = `${baseUrl}/r/${shortUrl.shortId}`;
-      } catch {
+      } catch (err) {
+        console.error("Dynamic mode error:", err);
         return NextResponse.json(
           {
             success: false,
-            error: "Dynamic mode requires a valid URL as content",
+            error:
+              err instanceof Error
+                ? err.message
+                : "Dynamic mode requires a valid URL as content",
           },
           { status: 400 }
         );
       }
     }
 
+    console.log("Success: Returning QR data");
     return NextResponse.json({
       success: true,
       data: {
@@ -74,9 +86,13 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("API Error:", error);
+    console.error("CRITICAL API Error:", error);
     return NextResponse.json(
-      { success: false, error: "Internal Server Error" },
+      {
+        success: false,
+        error: "Internal Server Error",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
